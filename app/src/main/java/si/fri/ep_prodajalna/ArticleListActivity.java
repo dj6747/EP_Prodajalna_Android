@@ -68,7 +68,6 @@ public class ArticleListActivity extends AppCompatActivity {
     }
 
     private void setupRecyclerView() {
-        //recyclerView.setAdapter(new SimpleItemRecyclerViewAdapter(Articles.ITEMS));
 
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(BASE_URL)
