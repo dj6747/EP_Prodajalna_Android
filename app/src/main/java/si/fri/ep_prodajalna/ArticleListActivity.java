@@ -7,17 +7,25 @@ import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
 
-import si.fri.ep_prodajalna.dummy.DummyContent;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+import si.fri.ep_prodajalna.articles.ArticlePOJO;
+import si.fri.ep_prodajalna.articles.ArticlesEndpointInterface;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * An activity representing a list of Articles. This activity
@@ -34,6 +42,8 @@ public class ArticleListActivity extends AppCompatActivity {
      * device.
      */
     private boolean mTwoPane;
+    public static final String BASE_URL = "http://localhost:3333/api/";
+    private RecyclerView recyclerView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,18 +54,9 @@ public class ArticleListActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         toolbar.setTitle(getTitle());
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-            }
-        });
-
-        View recyclerView = findViewById(R.id.article_list);
+        recyclerView = (RecyclerView) findViewById(R.id.article_list);
         assert recyclerView != null;
-        setupRecyclerView((RecyclerView) recyclerView);
+        setupRecyclerView();
 
         if (findViewById(R.id.article_detail_container) != null) {
             // The detail container view will be present only in the
@@ -66,16 +67,40 @@ public class ArticleListActivity extends AppCompatActivity {
         }
     }
 
-    private void setupRecyclerView(@NonNull RecyclerView recyclerView) {
-        recyclerView.setAdapter(new SimpleItemRecyclerViewAdapter(DummyContent.ITEMS));
+    private void setupRecyclerView() {
+        //recyclerView.setAdapter(new SimpleItemRecyclerViewAdapter(Articles.ITEMS));
+
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(BASE_URL)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build();
+
+        ArticlesEndpointInterface apiService =
+                retrofit.create(ArticlesEndpointInterface.class);
+
+        Call<List<ArticlePOJO>> call = apiService.getArticles();
+
+        call.enqueue(new Callback<List<ArticlePOJO>>() {
+            @Override
+            public void onResponse(Call<List<ArticlePOJO>> call, Response<List<ArticlePOJO>> response) {
+                int statusCode = response.code();
+                List<ArticlePOJO> articles = response.body();
+                recyclerView.setAdapter(new SimpleItemRecyclerViewAdapter(articles));
+            }
+
+            @Override
+            public void onFailure(Call<List<ArticlePOJO>> call, Throwable t) {
+                Log.e("Err", "Fail "+t.toString());
+            }
+        });
     }
 
     public class SimpleItemRecyclerViewAdapter
             extends RecyclerView.Adapter<SimpleItemRecyclerViewAdapter.ViewHolder> {
 
-        private final List<DummyContent.DummyItem> mValues;
+        private final List<ArticlePOJO> mValues;
 
-        public SimpleItemRecyclerViewAdapter(List<DummyContent.DummyItem> items) {
+        public SimpleItemRecyclerViewAdapter(List<ArticlePOJO> items) {
             mValues = items;
         }
 
@@ -89,24 +114,25 @@ public class ArticleListActivity extends AppCompatActivity {
         @Override
         public void onBindViewHolder(final ViewHolder holder, int position) {
             holder.mItem = mValues.get(position);
-            holder.mIdView.setText(mValues.get(position).id);
-            holder.mContentView.setText(mValues.get(position).content);
+            holder.mIdView.setText(String.valueOf(mValues.get(position).getId()));
+            holder.mContentView.setText(mValues.get(position).getName());
 
             holder.mView.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     if (mTwoPane) {
                         Bundle arguments = new Bundle();
-                        arguments.putString(ArticleDetailFragment.ARG_ITEM_ID, holder.mItem.id);
+                        arguments.putInt(ArticleDetailFragment.ARG_ITEM_ID, holder.mItem.getId());
                         ArticleDetailFragment fragment = new ArticleDetailFragment();
                         fragment.setArguments(arguments);
                         getSupportFragmentManager().beginTransaction()
                                 .replace(R.id.article_detail_container, fragment)
                                 .commit();
                     } else {
+                        Bundle arguments = new Bundle();
                         Context context = v.getContext();
                         Intent intent = new Intent(context, ArticleDetailActivity.class);
-                        intent.putExtra(ArticleDetailFragment.ARG_ITEM_ID, holder.mItem.id);
+                        intent.putExtra(ArticleDetailFragment.ARG_ITEM_ID, holder.mItem.getId());
 
                         context.startActivity(intent);
                     }
@@ -123,7 +149,7 @@ public class ArticleListActivity extends AppCompatActivity {
             public final View mView;
             public final TextView mIdView;
             public final TextView mContentView;
-            public DummyContent.DummyItem mItem;
+            public ArticlePOJO mItem;
 
             public ViewHolder(View view) {
                 super(view);
